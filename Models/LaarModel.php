@@ -23,31 +23,73 @@ class LaarModel extends Query
         $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado' WHERE guia = '$guia' ";
         $response =  $this->select($update);
         if ($estado > 2) {
-            $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia'";
-            $data = $this->select($sql);
-
-            $data = $data[0];
+            // Obtener datos de la factura
+            $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
+            $stmt = $this->select($sql);
+            $data = $stmt[0];
             if ($data) {
-                $id_plataforma = $data['id_plataforma'];
-                $sql = "SELECT * FROM plataformas WHERE id_plataforma = '$id_plataforma'";
-                $data = $this->select($sql);
-                $data = $data[0];
+                $id_plataforma = $data['id_plataforma']; // Vendedor
+                $id_propietario = $data['id_propietario']; // Proveedor
 
-                if ($data) {
-                    $refiere = $data['refiere'] ?? null;
-                    if (!empty($refiere)) {
-                        $sql = "SELECT 1 FROM cabecera_cuenta_referidos WHERE guia = '$guia' AND id_plataforma = '$refiere'";
-                        $exists = $this->select($sql);
+                // Obtener datos del vendedor
+                $sql = "SELECT refiere FROM plataformas WHERE id_plataforma = '$id_plataforma'";
+                $stmt = $this->select($sql);
+                $vendedorData = $stmt[0];
+                $refiere_vendedor = $vendedorData['refiere'] ?? null;
 
-                        if (count($exists) == 0) {
-                            $sql = "REPLACE INTO cabecera_cuenta_referidos (`guia`, `monto`, `fecha`, `id_plataforma`) VALUES ('$guia', 0.3, NOW(), '$refiere')";
-                            $data = $this->select($sql);
-                            $sql = "UPDATE billetera_referidos SET saldo = saldo + 0.3 WHERE id_plataforma = '$refiere'";
-                            $data = $this->select($sql);
-                        }
+                // Obtener datos del proveedor
+                $sql = "SELECT refiere FROM plataformas WHERE id_plataforma = '$id_propietario'";
+                $stmt = $this->select($sql);
+                $proveedorData = $stmt[0];
+                $refiere_proveedor = $proveedorData['refiere'] ?? null;
+
+                // Caso 1: Vendedor y Proveedor son referidos
+                if (!empty($refiere_vendedor) && !empty($refiere_proveedor)) {
+                    // Verificar si la tienda que refiere al proveedor es 1188
+                    if ($refiere_proveedor == 1188) {
+                        // Añadir al que refiere al vendedor y al proveedor
+                        $this->procesarGuia($guia, $refiere_vendedor);
+                        $this->procesarGuia($guia, $refiere_proveedor);
+                    } else {
+                        // Añadir solo al que refiere al vendedor
+                        $this->procesarGuia($guia, $refiere_vendedor);
                     }
+                } elseif (!empty($refiere_vendedor)) {
+                    // Caso 2: Solo el vendedor es referido
+                    $this->procesarGuia($guia, $refiere_vendedor);
+                } elseif (!empty($refiere_proveedor)) {
+                    // Caso 3: Solo el proveedor es referido
+                    $this->procesarGuia($guia, $refiere_proveedor);
                 }
+                // Caso 4: Si ninguno es referido, no hacer nada
             }
+        }
+    }
+
+    function procesarGuia($guia, $refiere)
+    {
+        // Verificar si la guía ya existe para esta plataforma
+        $sql = "SELECT 1 FROM cabecera_cuenta_referidos WHERE guia = '$guia' AND id_plataforma = '$refiere'";
+        $stmt = $this->select($sql);
+        $exists =  $stmt[0];
+
+        if ($exists) {
+            // Añadir nuevo registro a cabecera_cuenta_referidos
+            $sql = "REPLACE INTO cabecera_cuenta_referidos (guia, monto, fecha, id_plataforma) VALUES ('$guia', 0.3, NOW(), '$refiere')";
+            $stmt = $this->select($sql);
+
+            // Actualizar el saldo en billetera_referidos
+            $sql = "UPDATE billetera_referidos SET saldo = saldo + 0.3 WHERE id_plataforma = '$refiere'";
+            $stmt = $this->select($sql);
+
+            // Obtener saldo actual para el historial
+            $sql = "SELECT saldo FROM billetera_referidos WHERE id_plataforma = '$refiere'";
+            $stmt = $this->select($sql);
+            // Insertar en el historial de referidos
+            $sql = "INSERT INTO historial_referidos (id_billetera, motivo, monto, previo, fecha) 
+                 SELECT id_billetera, 'Referido por guia: $guia', 0.3, saldo, NOW() 
+                 FROM billetera_referidos WHERE id_plataforma = '$refiere'";
+            $stmt = $this->select($sql);
         }
     }
 
