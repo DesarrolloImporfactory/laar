@@ -71,7 +71,13 @@ class LaarModel extends Query
         // Verificar si la guía ya existe para esta plataforma
         $sql = "SELECT 1 FROM cabecera_cuenta_referidos WHERE guia = '$guia' AND id_plataforma = '$refiere'";
         $stmt = $this->select($sql);
-        $exists =  $stmt[0];
+
+        if (count($stmt) == 0) {
+            $exists = false;
+        } else {
+
+            $exists =  $stmt[0];
+        }
 
         if ($exists) {
             // Añadir nuevo registro a cabecera_cuenta_referidos
@@ -104,10 +110,18 @@ class LaarModel extends Query
         $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
         $response = $this->select($sql);
         $nombreC = $response[0]['nombre'];
-
+        echo "XDs";
         foreach ($novedades as $novedad) {
             if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
+                $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = '$guia' ";
+                $response = $this->select($sql);
+                /*     $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
+                $response = $this->select($sql);
+                echo "eliminado";
 
+                $sql = "DELETE FROM novedades WHERE guia_novedad = '$guia' ";
+                $response = $this->select($sql);
+                echo "eliminado"; */
                 if ($novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
 
                     $this->actualizarEstado(9, $guia);
@@ -118,6 +132,8 @@ class LaarModel extends Query
                     }
                 }
                 $avisar = false;
+                //eliminar novedades
+
                 break;
             }
 
@@ -136,6 +152,18 @@ class LaarModel extends Query
 
                 $response = $this->insert("INSERT INTO detalle_novedad (codigo_novedad, guia_novedad, nombre_novedad, detalle_novedad, observacion, id_plataforma) VALUES (?, ?, ?, ?, ?, ?)", [$codigo, $guia, $nombre, $detalle, $observacion, $id_plataforma]);
                 print_r($response);
+
+                //verificar si existe la novedad en la tabla novedades
+
+                $sql = "SELECT * FROM novedades WHERE guia_novedad = '$guia' ";
+
+                $response = $this->select($sql);
+
+                if (count($response) == 0) {
+                } else {
+                    $SQL = "UPDATE novedades SET estado_novedad = '$codigo', novedad = '$detalle' WHERE guia_novedad = '$guia' ";
+                    $response = $this->select($SQL);
+                }
             }
         }
         echo $avisar;
@@ -152,7 +180,7 @@ class LaarModel extends Query
             $response = $this->insert($sql, [$guia, $nombreC, $codigo, $detalle, $tracking, $novedad["fechaNovedad"], $id_plataforma]);
             print_r($response);
             if ($avisar) {
-                //$this->enviarCorreo($guia);
+                $this->enviarCorreo($guia);
             }
         } else {
             echo "No hay novedades";

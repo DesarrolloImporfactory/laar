@@ -4,9 +4,12 @@ class Laar extends Controller
 {
     public function index()
     {
+
+
         $json = file_get_contents('php://input');
         $data = json_decode($json, true);
 
+        $this->model->capturador($json);
         // Eliminar el campo 'imagenes' si existe
         if (isset($data['imagenes'])) {
             unset($data['imagenes']);
@@ -78,6 +81,8 @@ class Laar extends Controller
         }
 
         if ($notificar) {
+            $this->model->notificar($novedades, $noGuia);
+        } else {
             $this->model->notificar($novedades, $noGuia);
         }
     }
