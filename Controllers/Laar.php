@@ -4,8 +4,6 @@ class Laar extends Controller
 {
     public function index()
     {
-
-
         $json = file_get_contents('php://input');
         $data = json_decode($json, true);
 
@@ -18,6 +16,8 @@ class Laar extends Controller
         $estadoActualCodigo = $data['estadoActualCodigo'];
         $novedades = $data['novedades'];
         $noGuia = $data['noGuia'];
+
+        $peso = $data['pesoKilos'];
 
         $esEntregado = false;
         $esDevolucion = false;
@@ -66,24 +66,24 @@ class Laar extends Controller
 
         // Verificar novedades no coincidentes para notificación
         foreach ($novedades as $novedad) {
-            if (!in_array($novedad['codigoTipoNovedad'], [42, 43, 92, 96])) {
+            if (!in_array($novedad['codigoTipoNovedad'], [42, 43, 44, 92, 96])) {
                 $notificar = true;
                 break;
             }
         }
 
         if ($esEntregado) {
-            $this->model->actualizarEstado(7, $noGuia);
+            $this->model->actualizarEstado(7, $noGuia, $peso);
         } elseif ($esDevolucion) {
-            $this->model->actualizarEstado(9, $noGuia);
+            $this->model->actualizarEstado(9, $noGuia, $peso);
         } else {
-            $response = $this->model->actualizarEstado($estadoActualCodigo, $noGuia);
+            $response = $this->model->actualizarEstado($estadoActualCodigo, $noGuia, $peso);
         }
 
         if ($notificar) {
-            $this->model->notificar($novedades, $noGuia);
+            $this->model->notificar($novedades, $noGuia, $peso);
         } else {
-            $this->model->notificar($novedades, $noGuia);
+            $this->model->notificar($novedades, $noGuia, $peso);
         }
     }
 

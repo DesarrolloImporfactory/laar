@@ -16,12 +16,14 @@ class LaarModel extends Query
         $this->insert("INSERT INTO laar (json) VALUES (?)", [$json]);
     }
 
-    public function actualizarEstado($estado, $guia)
+    public function actualizarEstado($estado, $guia, $peso)
     {
-        $sql = "UPDATE facturas_cot set estado_guia_sistema = '$estado' WHERE numero_guia = '$guia' ";
+        $sql = "UPDATE facturas_cot set estado_guia_sistema = '$estado'  WHERE numero_guia = '$guia' ";
         $response =  $this->select($sql);
-        $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado' WHERE guia = '$guia' ";
+        $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado', peso = '$peso' WHERE guia = '$guia' ";
+        echo $update;
         $response =  $this->select($update);
+        print_r($response);
         if ($estado > 2) {
             // Obtener datos de la factura
             $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
@@ -99,7 +101,7 @@ class LaarModel extends Query
         }
     }
 
-    public function notificar($novedades, $guia)
+    public function notificar($novedades, $guia, $peso)
     {
         $id_plataforma = $this->select("SELECT id_plataforma FROM facturas_cot WHERE numero_guia = '$guia' ")[0]['id_plataforma'];
         echo $id_plataforma;
@@ -112,7 +114,7 @@ class LaarModel extends Query
         $nombreC = $response[0]['nombre'];
         echo "XDs";
         foreach ($novedades as $novedad) {
-            if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
+            if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 44 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
                 $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = '$guia' ";
                 $response = $this->select($sql);
                 /*     $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
@@ -124,11 +126,12 @@ class LaarModel extends Query
                 echo "eliminado"; */
                 if ($novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
 
-                    $this->actualizarEstado(9, $guia);
+                    $this->actualizarEstado(9, $guia, $peso);
                     $valor_pendiente = $this->obtenerValorPendiente($guia);
                     echo ". " . $valor_pendiente;
                     if ($valor_pendiente != 0) {
-                        $response2 = $this->select("UPDATE cabecera_cuenta_pagar set valor_pendiente = ((precio_envio + full) * -1), monto_recibir = ((precio_envio + full) * -1) where guia = '$guia'; ");
+                        if (strpos($guia, "IMP") == 0)
+                            $response2 = $this->select("UPDATE cabecera_cuenta_pagar set valor_pendiente = ((precio_envio + full) * -1), monto_recibir = ((precio_envio + full) * -1), peso = '$peso' where guia = '$guia'; ");
                     }
                 }
                 $avisar = false;
