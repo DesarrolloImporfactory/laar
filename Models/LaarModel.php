@@ -23,7 +23,6 @@ class LaarModel extends Query
         $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado', peso = '$peso' WHERE guia = '$guia' ";
         echo $update;
         $response =  $this->select($update);
-        print_r($response);
         if ($estado > 2) {
             // Obtener datos de la factura
             $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
@@ -31,6 +30,9 @@ class LaarModel extends Query
             $data = $stmt[0];
             if ($data) {
                 $id_plataforma = $data['id_plataforma']; // Vendedor
+                /*      if ($id_plataforma == 2324 || $id_plataforma == 3031) {
+                    return;
+                } */
                 $id_propietario = $data['id_propietario']; // Proveedor
 
                 // Obtener datos del vendedor
@@ -66,6 +68,9 @@ class LaarModel extends Query
                 // Caso 4: Si ninguno es referido, no hacer nada
             }
         }
+        $this->webhookTelefono($guia, $estado);
+        // se añaade a la bitacora
+        $this->bitacora($guia, $estado);
     }
 
     function procesarGuia($guia, $refiere)
@@ -73,14 +78,11 @@ class LaarModel extends Query
         // Verificar si la guía ya existe para esta plataforma
         $sql = "SELECT 1 FROM cabecera_cuenta_referidos WHERE guia = '$guia' AND id_plataforma = '$refiere'";
         $stmt = $this->select($sql);
-
         if (count($stmt) == 0) {
             $exists = false;
         } else {
-
             $exists =  $stmt[0];
         }
-
         if ($exists) {
             // Añadir nuevo registro a cabecera_cuenta_referidos
             $sql = "REPLACE INTO cabecera_cuenta_referidos (guia, monto, fecha, id_plataforma) VALUES ('$guia', 0.3, NOW(), '$refiere')";
@@ -101,77 +103,63 @@ class LaarModel extends Query
         }
     }
 
-    public function notificar($novedades, $guia, $peso)
+    public function notificar($novedades, $guia, $peso, $estadoActualCodigo)
     {
         $id_plataforma = $this->select("SELECT id_plataforma FROM facturas_cot WHERE numero_guia = '$guia' ")[0]['id_plataforma'];
-        echo $id_plataforma;
-
-
         $avisar = false;
         $nombre = "";
         $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
         $response = $this->select($sql);
         $nombreC = $response[0]['nombre'];
-        echo "XDs";
-        foreach ($novedades as $novedad) {
-            if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 44 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
-                $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = '$guia' ";
-                $response = $this->select($sql);
-                /*     $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
+        if ($estadoActualCodigo == 7 || $estadoActualCodigo == 9) {
+        } else {
+
+            foreach ($novedades as $novedad) {
+                echo $novedad['codigoTipoNovedad'] . " Entro";
+                if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 44 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
+                    $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = '$guia' ";
+                    $response = $this->select($sql);
+                    /*     $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
                 $response = $this->select($sql);
                 echo "eliminado";
-
                 $sql = "DELETE FROM novedades WHERE guia_novedad = '$guia' ";
                 $response = $this->select($sql);
                 echo "eliminado"; */
-                if ($novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
+                    if ($novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
 
-                    $this->actualizarEstado(9, $guia, $peso);
-                    $valor_pendiente = $this->obtenerValorPendiente($guia);
-                    echo ". " . $valor_pendiente;
-                    if ($valor_pendiente != 0) {
-                        if (strpos($guia, "IMP") == 0)
-                            $response2 = $this->select("UPDATE cabecera_cuenta_pagar set valor_pendiente = ((precio_envio + full) * -1), monto_recibir = ((precio_envio + full) * -1), peso = '$peso' where guia = '$guia'; ");
+                        $this->actualizarEstado(9, $guia, $peso);
+                        $valor_pendiente = $this->obtenerValorPendiente($guia);
+                        if ($valor_pendiente != 0) {
+                            if (strpos($guia, "IMP") == 0)
+                                $response2 = $this->select("UPDATE cabecera_cuenta_pagar set valor_pendiente = ((precio_envio + full) * -1), monto_recibir = ((precio_envio + full) * -1), peso = '$peso' where guia = '$guia'; ");
+                        }
                     }
+                    $avisar = false;
+                    //eliminar novedades
+                    break;
                 }
-                $avisar = false;
-                //eliminar novedades
-
-                break;
-            }
-
-            $sql = "SELECT * FROM detalle_novedad WHERE guia_novedad = '$guia' AND codigo_novedad = '" . $novedad['codigoTipoNovedad'] . "' ";
-            $response = $this->select($sql);
-            print_r($response);
-
-            if (count($response) == 0) {
-                echo "entre";
-
-                $avisar = true;
-                $codigo = $novedad["codigoTipoNovedad"];
-                $nombre = $novedad['nombreDetalleNovedad'];
-                $detalle = $novedad['nombreTipoNovedad'];
-                $observacion = $novedad['observacion'];
-
-                $response = $this->insert("INSERT INTO detalle_novedad (codigo_novedad, guia_novedad, nombre_novedad, detalle_novedad, observacion, id_plataforma) VALUES (?, ?, ?, ?, ?, ?)", [$codigo, $guia, $nombre, $detalle, $observacion, $id_plataforma]);
-                print_r($response);
-
-                //verificar si existe la novedad en la tabla novedades
-
-                $sql = "SELECT * FROM novedades WHERE guia_novedad = '$guia' ";
-
+                $sql = "SELECT * FROM detalle_novedad WHERE guia_novedad = '$guia' AND codigo_novedad = '" . $novedad['codigoTipoNovedad'] . "' ";
                 $response = $this->select($sql);
-
                 if (count($response) == 0) {
-                } else {
-                    $SQL = "UPDATE novedades SET estado_novedad = '$codigo', novedad = '$detalle' WHERE guia_novedad = '$guia' ";
-                    $response = $this->select($SQL);
+                    $avisar = true;
+                    $codigo = $novedad["codigoTipoNovedad"];
+                    $nombre = $novedad['nombreDetalleNovedad'];
+                    $detalle = $novedad['nombreTipoNovedad'];
+                    $observacion = $novedad['observacion'];
+                    $response = $this->insert("INSERT INTO detalle_novedad (codigo_novedad, guia_novedad, nombre_novedad, detalle_novedad, observacion, id_plataforma) VALUES (?, ?, ?, ?, ?, ?)", [$codigo, $guia, $nombre, $detalle, $observacion, $id_plataforma]);
+                    print_r($response);
+                    //verificar si existe la novedad en la tabla novedades
+                    $sql = "SELECT * FROM novedades WHERE guia_novedad = '$guia' ";
+                    $response = $this->select($sql);
+                    if (count($response) == 0) {
+                    } else {
+                        $SQL = "UPDATE novedades SET estado_novedad = '$codigo', novedad = '$detalle' WHERE guia_novedad = '$guia' ";
+                        $response = $this->select($SQL);
+                    }
                 }
             }
         }
-        echo $avisar;
         if ($avisar) {
-
             $sql = "INSERT INTO novedades (guia_novedad, cliente_novedad, estado_novedad, novedad, tracking, fecha, id_plataforma) VALUES (?, ?, ?, ?, ?, ?, ?)";
             if (strpos($guia, 'IMP') == 0) {
                 $tracking = "https://fenix.laarcourier.com/Tracking/Guiacompleta.aspx?guia=" . $guia;
@@ -181,13 +169,22 @@ class LaarModel extends Query
                 $tracking = "https://www.servientrega.com.ec/Tracking/?guia=" . $guia . "&tipo=GUI";
             }
             $response = $this->insert($sql, [$guia, $nombreC, $codigo, $detalle, $tracking, $novedad["fechaNovedad"], $id_plataforma]);
-            print_r($response);
             if ($avisar) {
                 $this->enviarCorreo($guia);
             }
         } else {
             echo "No hay novedades";
         }
+    }
+
+    public function terminar_novedad($guia)
+    {
+        $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = ? ";
+        echo $sql;
+        $response = $this->update($sql, [$guia]);
+        print_r($response);
+        $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
+        $response = $this->select($sql);
     }
 
     public function enviarCorreo($guia)
@@ -197,12 +194,10 @@ class LaarModel extends Query
         $data_factura = $select[0];
         $id_plataforma = $data_factura['id_plataforma'];
         $id_usuario = $data_factura['id_usuario'];
-
         $datos = "SELECT * FROM users WHERE id_users = '$id_usuario' ";
         $select = $this->select($datos);
         $data_usuario = $select[0];
         $correo = $data_usuario['email_users'];
-
         require_once 'PHPMailer/Mail_devolucion.php';
         $mail = new PHPMailer();
         $mail->isSMTP();
@@ -220,7 +215,6 @@ class LaarModel extends Query
         $mail->Subject = 'Novedad de pedido en Imporsuitpro';
         $mail->Body = $message_body_pedido;
         // $this->crearSubdominio($tienda);
-
         if ($mail->send()) {
             echo "Correo enviado";
         } else {
@@ -231,13 +225,11 @@ class LaarModel extends Query
     {
         $sql = "SELECT * FROM facturas_cot WHERE numero_guia like 'IMP%' and estado_guia_sistema != 8 ORDER BY `numero_factura` DESC";
         $guias = $this->select($sql);
-
         // Procesar en lotes
         $batch_size = 20; // Tamaño del lote
         $delay = 1; // Retraso en segundos entre lotes
         $total_guias = count($guias);
         $batches = ceil($total_guias / $batch_size);
-
         for ($i = 0; $i < $batches; $i++) {
             $batch_guias = array_slice($guias, $i * $batch_size, $batch_size);
             foreach ($batch_guias as $guia) {
@@ -253,9 +245,7 @@ class LaarModel extends Query
         // Inicializar cURL para la primera solicitud
         $ch = curl_init("https://api.laarcourier.com:9727/guias/" . $guia);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
         $response = curl_exec($ch);
-
         if ($response === false) {
             // Manejar errores en la solicitud
             $error_msg = curl_error($ch);
@@ -270,9 +260,7 @@ class LaarModel extends Query
         curl_setopt($ch2, CURLOPT_POST, 1);
         curl_setopt($ch2, CURLOPT_POSTFIELDS, $response);
         curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-
         $response2 = curl_exec($ch2);
-
         if ($response2 === false) {
             // Manejar errores en la segunda solicitud
             $error_msg2 = curl_error($ch2);
@@ -281,10 +269,8 @@ class LaarModel extends Query
             echo "Error en la segunda solicitud: $error_msg2";
             return;
         }
-
         curl_close($ch2);
         curl_close($ch);
-
         echo $response2;
     }
 
@@ -294,5 +280,70 @@ class LaarModel extends Query
         $response = $this->select($sql);
         $valor_pendiente = $response[0]['valor_pendiente'];
         return $valor_pendiente;
+    }
+
+    public function webhookTelefono($guia, $estado)
+    {
+        $id_factura = $this->getIdFactura($guia);
+        $ch = curl_init("https://new.imporsuitpro.com/speed/automatizador");
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //formdata 
+        $data = array(
+            'id_factura' => $id_factura,
+            'estado' => $estado
+        );
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+    }
+
+    public function getIdFactura($guia)
+    {
+        $sql = "SELECT * FROM facturas_cot WHERE numero_guia = '$guia' ";
+        $response = $this->select($sql);
+        $id_factura = $response[0]['id_factura'];
+        return $id_factura;
+    }
+
+    public function verificarAutomatizacion($id_factura)
+    {
+        $sql = "SELECT * FROM facturas_cot WHERE id_factura = '$id_factura' ";
+        $response = $this->select($sql);
+        $id_plataforma = $response[0]['id_plataforma'];
+        $sql = "SELECT * FROM configuraciones WHERE id_plataforma = '$id_plataforma' ";
+        $res = $this->select($sql);
+        if (count($res) == 0) {
+            return false;
+        }
+        $response['status'] = 200;
+        $response['message'] = "Configuración encontrada.";
+        $response['data'] = $res[0];
+        $response['data']['estado'] = $res[0]['estado_guia_sistema'];
+        $response['data']['telefono'] = $res[0]['celular'];
+        $response['data']['nombre'] = $res[0]['nombre'];
+        $response['data']['numero_factura'] = $res[0]['numero_factura'];
+        $response['data']['c_principal'] = $res[0]['c_principal'];
+        $response['data']['c_secundaria'] = $res[0]['c_secundaria'];
+        $response['data']['c_secundaria'] = $res[0]['c_secundaria'];
+        $response['data']['id_transporte'] = $res[0]['id_transporte'];
+        return $response;
+    }
+
+    private function bitacora($guia, $estado)
+    {
+        $ch = curl_init("https://new.imporsuitpro.com/bitacora/estados");
+        curl_setopt($ch, CURLOPT_POST, 1);
+        //formdata
+        $data = [
+            'guia' => $guia,
+            'estado' => $estado,
+            'transportadora' => 'Laar'
+        ];
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        echo $response;
     }
 }

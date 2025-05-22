@@ -74,16 +74,23 @@ class Laar extends Controller
 
         if ($esEntregado) {
             $this->model->actualizarEstado(7, $noGuia, $peso);
+
+            $this->model->terminar_novedad($noGuia);
         } elseif ($esDevolucion) {
             $this->model->actualizarEstado(9, $noGuia, $peso);
+
+            $this->model->terminar_novedad($noGuia);
         } else {
+            echo "????";
+            if ($estadoActualCodigo == 7 || $estadoActualCodigo == 9)
+                $this->model->terminar_novedad($noGuia);
             $response = $this->model->actualizarEstado($estadoActualCodigo, $noGuia, $peso);
         }
 
         if ($notificar) {
-            $this->model->notificar($novedades, $noGuia, $peso);
+            $this->model->notificar($novedades, $noGuia, $peso, $estadoActualCodigo);
         } else {
-            $this->model->notificar($novedades, $noGuia, $peso);
+            $this->model->notificar($novedades, $noGuia, $peso, $estadoActualCodigo);
         }
     }
 
