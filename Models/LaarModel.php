@@ -21,7 +21,6 @@ class LaarModel extends Query
         $sql = "UPDATE facturas_cot set estado_guia_sistema = '$estado'  WHERE numero_guia = '$guia' ";
         $response =  $this->select($sql);
         $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado', peso = '$peso' WHERE guia = '$guia' ";
-        echo $update;
         $response =  $this->select($update);
         if ($estado > 2) {
             // Obtener datos de la factura
@@ -71,6 +70,14 @@ class LaarModel extends Query
         $this->webhookTelefono($guia, $estado);
         // se añaade a la bitacora
         $this->bitacora($guia, $estado);
+        echo json_encode(
+            [
+                'status' => 'success',
+                'message' => 'Estado actualizado correctamente.',
+                'guia' => $guia,
+                'estado' => $estado
+            ]
+        );
     }
 
     function procesarGuia($guia, $refiere)
@@ -115,13 +122,11 @@ class LaarModel extends Query
         } else {
 
             foreach ($novedades as $novedad) {
-                echo $novedad['codigoTipoNovedad'] . " Entro";
                 if ($novedad['codigoTipoNovedad'] == 42 || $novedad['codigoTipoNovedad'] == 43 || $novedad['codigoTipoNovedad'] == 44 || $novedad['codigoTipoNovedad'] == 92 || $novedad['codigoTipoNovedad'] == 96) {
                     $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = '$guia' ";
                     $response = $this->select($sql);
                     /*     $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
                 $response = $this->select($sql);
-                echo "eliminado";
                 $sql = "DELETE FROM novedades WHERE guia_novedad = '$guia' ";
                 $response = $this->select($sql);
                 echo "eliminado"; */
@@ -172,15 +177,12 @@ class LaarModel extends Query
             if ($avisar) {
                 $this->enviarCorreo($guia);
             }
-        } else {
-            echo "No hay novedades";
         }
     }
 
     public function terminar_novedad($guia)
     {
         $sql = "UPDATE novedades SET terminado = 1 WHERE guia_novedad = ? ";
-        echo $sql;
         $response = $this->update($sql, [$guia]);
         print_r($response);
         $sql = "DELETE FROM `detalle_novedad` where guia_novedad = '$guia' ";
@@ -215,11 +217,8 @@ class LaarModel extends Query
         $mail->Subject = 'Novedad de pedido en Imporsuitpro';
         $mail->Body = $message_body_pedido;
         // $this->crearSubdominio($tienda);
-        if ($mail->send()) {
-            echo "Correo enviado";
-        } else {
-            //  echo "Error al enviar el correo: " . $mail->ErrorInfo;
-        }
+        $mail->send();
+
     }
     public function masivo()
     {
@@ -250,7 +249,7 @@ class LaarModel extends Query
             // Manejar errores en la solicitud
             $error_msg = curl_error($ch);
             curl_close($ch);
-            echo "Error en la solicitud: $error_msg";
+            echo  json_encode(array("status" => 400, "message" => "Error en la solicitud: $error_msg"));
             return;
         }
 
@@ -266,12 +265,11 @@ class LaarModel extends Query
             $error_msg2 = curl_error($ch2);
             curl_close($ch2);
             curl_close($ch);
-            echo "Error en la segunda solicitud: $error_msg2";
+            echo json_encode(array("status" => 400, "message" => "Error en la segunda solicitud: $error_msg2"));
             return;
         }
         curl_close($ch2);
         curl_close($ch);
-        echo $response2;
     }
 
     public function obtenerValorPendiente($guia)
@@ -344,6 +342,5 @@ class LaarModel extends Query
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
         curl_close($ch);
-        echo $response;
     }
 }

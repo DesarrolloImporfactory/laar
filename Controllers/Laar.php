@@ -4,7 +4,27 @@ class Laar extends Controller
 {
     public function index()
     {
+        header('Content-Type: application/json');
+
+        // Si se detecta que es GET mostrar mensaje de error
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            echo json_encode(
+                [
+                    'status' => 'error',
+                    'message' => 'Método no permitido. Se esperaba una solicitud POST.'
+                ]
+            );
+            return;
+        }
         $json = file_get_contents('php://input');
+        if (empty($json)) {
+            echo json_encode(
+                [
+                    'status' => 'error',
+                    'message' => 'Se esperaba un JSON en el cuerpo de la solicitud.'
+                ]
+            );
+        }
         $data = json_decode($json, true);
 
         $this->model->capturador($json);
@@ -81,7 +101,7 @@ class Laar extends Controller
 
             $this->model->terminar_novedad($noGuia);
         } else {
-            echo "????";
+
             if ($estadoActualCodigo == 7 || $estadoActualCodigo == 9)
                 $this->model->terminar_novedad($noGuia);
             $response = $this->model->actualizarEstado($estadoActualCodigo, $noGuia, $peso);
