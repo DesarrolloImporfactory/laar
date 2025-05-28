@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 require_once 'Config/Config.php';
 
 
@@ -8,6 +11,8 @@ $array = explode('/', $rute);
 $controller = $array[0];
 $method = "index";
 $parameter = "";
+$controller = ucwords($controller);
+
 if (!empty($array[1])) {
     if (!empty($array[1] != "")) {
         $method = $array[1];
