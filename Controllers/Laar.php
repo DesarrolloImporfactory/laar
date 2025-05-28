@@ -4,6 +4,15 @@ class Laar extends Controller
 {
     public function index()
     {
+        file_put_contents(
+            '/var/log/laar_request.log',
+            "[" . date('c') . "]\n" .
+            "IP: " . $_SERVER['REMOTE_ADDR'] . "\n" .
+            "Headers:\n" . json_encode(getallheaders(), JSON_PRETTY_PRINT) . "\n" .
+            "Body:\n" . file_get_contents('php://input') . "\n\n",
+            FILE_APPEND
+        );
+
         header('Content-Type: application/json');
 
         // Si se detecta que es GET mostrar mensaje de error
