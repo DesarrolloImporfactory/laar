@@ -5,12 +5,26 @@ error_reporting(E_ALL);
 require_once 'PHPMailer/PHPMailer.php';
 require_once 'PHPMailer/SMTP.php';
 require_once 'PHPMailer/Exception.php';
+require_once 'Config/App/DotEnv.php';
 
 
 use PHPMailer\PHPMailer\PHPMailer;
 
 class LaarModel extends Query
 {
+    private $anotherServer;
+    public function __construct()
+    {
+        parent::__construct();
+        $this->anotherServer = AnotherServer::getInstance();
+        $config = [
+            "host" => env('DB_ANOTHER_HOST', 'localhost'),
+            "username" => env('DB_ANOTHER_USERNAME', 'localhost'),
+            "password" => env('DB_ANOTHER_PASSWORD', 'localhost'),
+            "database" => env('DB_ANOTHER_DATABASE', 'localhost'),
+        ];
+        $this->anotherServer->configure("chatcenter", $config);
+    }
     public function capturador($json)
     {
         $this->insert("INSERT INTO laar (json) VALUES (?)", [$json]);
@@ -18,6 +32,11 @@ class LaarModel extends Query
 
     public function actualizarEstado($estado, $guia, $peso)
     {
+        $id_factura_sql  = $this->select("SELECT id_factura FROM facturas_cot WHERE numero_guia = '$guia' ");
+        $id_factura = $id_factura_sql[0]['id_factura'];
+
+        $this->anotherServer->select("chatcenter", "UPDATE clientes_chat_center SET estado_factura = ? WHERE id_factura = ?", [$estado, $id_factura]);
+
         $sql = "UPDATE facturas_cot set estado_guia_sistema = '$estado'  WHERE numero_guia = '$guia' ";
         $response =  $this->select($sql);
         $update = "UPDATE cabecera_cuenta_pagar set estado_guia = '$estado', peso = '$peso' WHERE guia = '$guia' ";
@@ -218,7 +237,6 @@ class LaarModel extends Query
         $mail->Body = $message_body_pedido;
         // $this->crearSubdominio($tienda);
         $mail->send();
-
     }
     public function masivo()
     {
