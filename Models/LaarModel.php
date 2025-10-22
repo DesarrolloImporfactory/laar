@@ -16,6 +16,7 @@ class LaarModel extends Query
     private $anotherServer;
     public function __construct()
     {
+        parent::__construct();
         $this->anotherServer = AnotherServer::getInstance();
         $config = [
             "host" => env('DB_ANOTHER_HOST', 'localhost'),
