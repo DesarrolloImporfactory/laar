@@ -132,6 +132,11 @@ class LaarModel extends Query
 
     public function notificar($novedades, $guia, $peso, $estadoActualCodigo)
     {
+        $id_factura_sql  = $this->select("SELECT id_factura FROM facturas_cot WHERE numero_guia = '$guia' ");
+        $id_factura = $id_factura_sql[0]['id_factura'];
+
+
+
         $id_plataforma = $this->select("SELECT id_plataforma FROM facturas_cot WHERE numero_guia = '$guia' ")[0]['id_plataforma'];
         $avisar = false;
         $nombre = "";
@@ -180,6 +185,14 @@ class LaarModel extends Query
                     } else {
                         $SQL = "UPDATE novedades SET estado_novedad = '$codigo', novedad = '$detalle' WHERE guia_novedad = '$guia' ";
                         $response = $this->select($SQL);
+                        $texto = '{
+                            "novedad": "' . $detalle . '",
+                            "terminado": 0,
+                            "id_novedad": "' . $response[0]['id_novedad'] . '",
+                            "solucionado": 0
+                        }';
+
+                        $this->anotherServer->update("chatcenter", "UPDATE clientes_chat_center SET novedad_info = ? WHERE id_factura = ?", [$detalle, $id_factura]);
                     }
                 }
             }
@@ -194,6 +207,15 @@ class LaarModel extends Query
                 $tracking = "https://www.servientrega.com.ec/Tracking/?guia=" . $guia . "&tipo=GUI";
             }
             $response = $this->insert($sql, [$guia, $nombreC, $codigo, $detalle, $tracking, $novedad["fechaNovedad"], $id_plataforma]);
+
+            $id_factura = $this->getIdFactura($guia);
+            $texto = '{
+                "novedad": "' . $detalle . '",
+                "terminado": 0,
+                "id_novedad": "' . $response . '",
+                "solucionado": 0
+            }';
+            $this->anotherServer->update("chatcenter", "UPDATE clientes_chat_center SET novedad_info = ? WHERE id_factura = ?", [$texto, $id_factura]);
             if ($avisar) {
                 $this->enviarCorreo($guia);
             }
